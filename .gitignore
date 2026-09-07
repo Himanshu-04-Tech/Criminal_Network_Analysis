@@ -1,0 +1,111 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# =========================
+# Pytest
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# MyPy / Ruff
+# =========================
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+# VS Code / IDE
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Generated Outputs
+# =========================
+output/
+exports/
+reports/
+
+# =========================
+# Dataset Generator Outputs
+# =========================
+dataset_generator/generated/
+dataset_generator/output/
+
+# =========================
+# Graph Exports
+# =========================
+*.gexf
+*.graphml
+*.jsonl
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Frontend (Next.js)
+# =========================
+nexus-bharat-frontend/node_modules/
+nexus-bharat-frontend/.next/
+nexus-bharat-frontend/out/
+nexus-bharat-frontend/build/
+nexus-bharat-frontend/.turbo/
+
+# npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# TypeScript
+# =========================
+*.tsbuildinfo
+
+# =========================
+# Temporary Files
+# =========================
+tmp/
+temp/
+.cache/
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# SQLite
+# =========================
+*.db
+*.sqlite
+*.sqlite3

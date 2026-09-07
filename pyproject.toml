@@ -1,0 +1,18 @@
+[tool.pyright]
+include = [".", "nexus-bharat", "tests"]
+extraPaths = [
+    "nexus-bharat",
+    "nexus-bharat/graph_engine",
+    "nexus-bharat/dataset_generator",
+    "nexus-bharat/graph_analytics",
+    "graph_engine",
+    "dataset_generator",
+    "graph_analytics"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [
+    ".",
+    "nexus-bharat"
+]
