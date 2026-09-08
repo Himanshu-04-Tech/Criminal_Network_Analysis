@@ -16,10 +16,22 @@ from graph_engine.graph_builder import KnowledgeGraphBuilder
 from graph_engine.graph_queries import GraphQueryEngine
 from graph_engine.graph_statistics import GraphStatisticsCalculator
 
+# Optional Neo4j persistence integration
+try:
+    from neo4j_integration.config import get_neo4j_config
+    from neo4j_integration.driver import verify_connectivity
+    from neo4j_integration.repository import GraphRepository
+    from neo4j_integration.graph_adapter import GraphAdapter
+    NEO4J_AVAILABLE = True
+except ImportError:
+    NEO4J_AVAILABLE = False
+
 
 class KnowledgeGraphService:
     """
-    Singleton service managing in-memory Knowledge Graph lifecycle.
+    Singleton service managing Knowledge Graph lifecycle.
+    Supports persistent Neo4j-backed graph access with automatic fallback to
+    in-memory DatasetLoader when offline or running in disconnected unit tests.
     Designed for seamless integration with downstream modules:
     Module 3 (Hidden Connection Finder), Module 4 (Role Intelligence),
     Module 5 (Cross-Case Intelligence), Module 6 (Case Fusion),
@@ -29,21 +41,29 @@ class KnowledgeGraphService:
     _instance: Optional["KnowledgeGraphService"] = None
     _lock: threading.Lock = threading.Lock()
 
-    def __init__(self, data_dir: Optional[Path] = None):
+    def __init__(self, data_dir: Optional[Path] = None, use_neo4j: bool = True):
         self.data_dir = data_dir
+        self.use_neo4j = use_neo4j
         self.builder = KnowledgeGraphBuilder(data_dir)
+        self.repository: Optional[Any] = None
+        self.adapter: Optional[Any] = None
         self.query_engine: Optional[GraphQueryEngine] = None
         self.stats_calculator: Optional[GraphStatisticsCalculator] = None
         self.last_integrity_report: Optional[IntegrityReport] = None
         self._is_loaded: bool = False
+        self._is_neo4j_backed: bool = False
 
     @classmethod
-    def get_instance(cls, data_dir: Optional[Path] = None) -> "KnowledgeGraphService":
+    def get_instance(
+        cls,
+        data_dir: Optional[Path] = None,
+        use_neo4j: bool = True,
+    ) -> "KnowledgeGraphService":
         """Thread-safe singleton accessor."""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = cls(data_dir=data_dir)
+                    cls._instance = cls(data_dir=data_dir, use_neo4j=use_neo4j)
         return cls._instance
 
     @classmethod
@@ -52,14 +72,53 @@ class KnowledgeGraphService:
         with cls._lock:
             cls._instance = None
 
+    def is_neo4j_backed(self) -> bool:
+        """Return True if the active graph is backed by Neo4j."""
+        return self._is_neo4j_backed
+
+    def get_repository(self) -> Optional[Any]:
+        """Access the underlying Neo4j GraphRepository if connected."""
+        if not self._is_loaded:
+            self.load_graph()
+        return self.repository
+
     def load_graph(self, force_reload: bool = False) -> nx.MultiDiGraph:
-        """Load and index the Knowledge Graph if not already loaded, or when forced."""
+        """
+        Load and index the Knowledge Graph.
+        Attempts to load from persistent Neo4j if configured and populated;
+        otherwise falls back seamlessly to local JSON dataset files.
+        """
         if not self._is_loaded or force_reload:
-            graph, report = self.builder.build_graph()
-            self.query_engine = GraphQueryEngine(self.builder)
-            self.stats_calculator = GraphStatisticsCalculator(self.builder)
-            self.last_integrity_report = report
-            self._is_loaded = True
+            loaded_from_neo4j = False
+
+            if self.use_neo4j and NEO4J_AVAILABLE:
+                try:
+                    config = get_neo4j_config()
+                    connected, _ = verify_connectivity(config)
+                    if connected:
+                        self.repository = GraphRepository(config)
+                        self.adapter = GraphAdapter(config, self.repository)
+                        neo4j_graph = self.adapter.to_networkx()
+
+                        # Ensure Neo4j contains our populated dataset (136 nodes)
+                        if len(neo4j_graph.nodes) >= 100:
+                            _, report = self.builder.populate_from_graph(neo4j_graph)
+                            self.query_engine = GraphQueryEngine(self.builder)
+                            self.stats_calculator = GraphStatisticsCalculator(self.builder)
+                            self.last_integrity_report = report
+                            self._is_loaded = True
+                            self._is_neo4j_backed = True
+                            loaded_from_neo4j = True
+                except Exception:
+                    loaded_from_neo4j = False
+
+            if not loaded_from_neo4j:
+                graph, report = self.builder.build_graph()
+                self.query_engine = GraphQueryEngine(self.builder)
+                self.stats_calculator = GraphStatisticsCalculator(self.builder)
+                self.last_integrity_report = report
+                self._is_loaded = True
+                self._is_neo4j_backed = False
 
         return self.builder.graph
 

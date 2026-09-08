@@ -17,12 +17,15 @@ def main():
         "-m",
         type=str,
         default="8",
-        choices=["3", "4", "5", "6", "7", "8", "all"],
-        help="Module demo to execute (default: 8 for Graph Diff Engine, 7 for Temporal Intelligence Engine, 6 for Case Fusion, 5 for Cross Case Intelligence, 4 for Network Role Intelligence, 3 for Hidden Connection Finder, all for all intelligence modules)",
+        choices=["3", "4", "5", "6", "7", "8", "neo4j", "all"],
+        help="Module demo to execute (default: 8 for Graph Diff Engine, 7 for Temporal Intelligence Engine, 6 for Case Fusion, 5 for Cross Case Intelligence, 4 for Network Role Intelligence, 3 for Hidden Connection Finder, neo4j for Neo4j Database Integration, all for all intelligence modules)",
     )
     args = parser.parse_args()
 
-    if args.module == "3":
+    if args.module == "neo4j":
+        from neo4j_integration.demo import run_demo as run_neo4j_demo
+        run_neo4j_demo()
+    elif args.module == "3":
         from graph_analytics.demo import run_demo as run_m3_demo
         run_m3_demo()
     elif args.module == "4":

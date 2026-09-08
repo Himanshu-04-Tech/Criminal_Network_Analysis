@@ -119,6 +119,70 @@ class KnowledgeGraphBuilder:
         report = GraphValidator.audit_graph(self.graph)
         return self.graph, report
 
+    def populate_from_graph(self, graph: nx.MultiDiGraph) -> Tuple[nx.MultiDiGraph, IntegrityReport]:
+        """Index an externally supplied MultiDiGraph (e.g., from Neo4j GraphAdapter)."""
+        self.graph = graph
+        self.node_index.clear()
+        self.type_index.clear()
+        self.case_entities_index.clear()
+        self.case_relationships_index.clear()
+        self.edge_id_index.clear()
+        self.edge_type_index.clear()
+
+        for node_id, data in graph.nodes(data=True):
+            node_type = data.get("type", "UNKNOWN")
+            node_name = data.get("name", node_id)
+            created_at = data.get("created_at", "")
+            attrs = data.get("attributes", {})
+            node = NodeModel(
+                id=node_id,
+                type=node_type,
+                name=node_name,
+                created_at=created_at,
+                attributes=attrs,
+            )
+            self.node_index[node_id] = node
+            self.type_index.setdefault(node_type, set()).add(node_id)
+            if node_type == "CASE":
+                self.case_index[node_id] = CaseModel(
+                    id=node_id,
+                    title=node_name,
+                    status=attrs.get("status", "OPEN"),
+                    created_at=created_at,
+                )
+                self.case_entities_index.setdefault(node_id, set())
+                self.case_relationships_index.setdefault(node_id, [])
+
+        for u, v, key, data in graph.edges(keys=True, data=True):
+            rel_id = data.get("relationship_id", key)
+            rel_type = data.get("relationship_type", "RELATED_TO")
+            case_id = data.get("case_id", "")
+            timestamp = data.get("timestamp", "")
+            confidence = float(data.get("confidence", 1.0))
+            evidence_id = data.get("evidence_id", "")
+            attrs = data.get("attributes", {})
+
+            edge = EdgeModel(
+                relationship_id=rel_id,
+                source=u,
+                target=v,
+                relationship_type=rel_type,
+                case_id=case_id,
+                timestamp=timestamp,
+                confidence=confidence,
+                evidence_id=evidence_id,
+                attributes=attrs,
+            )
+            self.edge_id_index[rel_id] = (u, v, key)
+            self.edge_type_index.setdefault(rel_type, []).append(edge)
+            if case_id:
+                self.case_relationships_index.setdefault(case_id, []).append(edge)
+                self.case_entities_index.setdefault(case_id, set()).add(u)
+                self.case_entities_index.setdefault(case_id, set()).add(v)
+
+        report = GraphValidator.audit_graph(self.graph)
+        return self.graph, report
+
     # --- Export Capabilities ---
 
     def _prepare_export_graph(self) -> nx.MultiDiGraph:
